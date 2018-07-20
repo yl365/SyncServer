@@ -4,6 +4,8 @@ package main
 import (
 	"math/rand"
 	"net/http"
+	"os"
+	"runtime/pprof"
 	"strings"
 	"time"
 
@@ -19,8 +21,9 @@ var staticHandler http.Handler = http.FileServer(http.Dir("./www/"))
 
 func init() {
 	rand.Seed(time.Now().Unix())
-	SetLog("debug", "./log", "Log-")
-	confinit()
+	SetLog("./log", "Log-")
+	LoadConfig()
+	SetLogLevel(g_conf.LogLevel)
 
 	redisPool = newPool(g_conf.RedisServer, g_conf.RedisPasswd, int(g_conf.RedisDB))
 	UserRedisPool = newPool(g_conf.UserRedisServer, g_conf.UserRedisPasswd, int(g_conf.UserRedisDB))
@@ -31,7 +34,7 @@ func (h *HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	Info("ServeHTTP RemoteAddr=%s, r.URL.Path=%s, Form=%+v", r.RemoteAddr, r.URL.Path, r.Form)
 
-	if IsLimit(r.RemoteAddr, g_conf.ReqFreqLimit) {
+	if g_conf.ReqFreqLimit > 0 && IsLimit(r.RemoteAddr, g_conf.ReqFreqLimit) {
 		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(ReqFreqLimit)\"}"))
 		return
 	}
@@ -62,11 +65,14 @@ func (h *HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	Info("\n\n\n##################### start...")
+	cpuf, _ := os.Create("cpu_profile")
+	pprof.StartCPUProfile(cpuf)
+
+	Info("##################### start...")
 	go crontab()
 
 	server := &http.Server{
-		Addr:              ":9999",
+		Addr:              g_conf.Listen,
 		Handler:           &HttpHandler{},
 		ReadHeaderTimeout: 3 * time.Second,
 		ReadTimeout:       10 * time.Second,
@@ -77,7 +83,7 @@ func main() {
 
 	err := server.ListenAndServe()
 	if err != nil {
-		Fatal("ListenAndServe: ", err)
+		Fatal("ListenAndServe: %s", err)
 	}
 }
 
@@ -89,6 +95,11 @@ func crontab() {
 	for {
 		select {
 		case <-ticker1M.C:
+			pprof.StopCPUProfile()
+
+			memf, _ := os.Create("mem_profile")
+			pprof.WriteHeapProfile(memf)
+			memf.Close()
 
 		case <-ticker5M.C:
 

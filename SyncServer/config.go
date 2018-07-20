@@ -6,6 +6,7 @@ import (
 )
 
 type Config struct {
+	LogLevel     string
 	Listen       string
 	ReqFreqLimit uint16
 
@@ -26,10 +27,10 @@ type Config struct {
 
 var g_conf Config
 
-func confinit() {
+func LoadConfig() {
 	if _, err := toml.DecodeFile("./config.toml", &g_conf); err != nil {
-		Fatal("confinit err=%s", err)
+		Fatal("LoadConfig err=%s", err)
 	}
 
-	Info("confinit g_conf=\n%+v", g_conf)
+	Info("LoadConfig g_conf=\n%+v", g_conf)
 }

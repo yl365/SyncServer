@@ -45,21 +45,7 @@ func getGID() uint64 {
 	return n
 }
 
-func SetLog(level, path, prefix string) {
-
-	level = strings.ToLower(level)
-	switch level {
-	case "fatal":
-		g_level = LvlFatal
-	case "error":
-		g_level = LvlError
-	case "warn":
-		g_level = LvlWarn
-	case "info":
-		g_level = LvlInfo
-	case "debug":
-		g_level = LvlDebug
-	}
+func SetLog(path, prefix string) {
 
 	if len(path) > 0 {
 		g_path = path
@@ -78,7 +64,23 @@ func SetLog(level, path, prefix string) {
 		println("create log file err, exit! err =", err.Error(), filePathName)
 		os.Exit(-1)
 	}
+}
 
+func SetLogLevel(level string) {
+
+	level = strings.ToLower(level)
+	switch level {
+	case "fatal":
+		g_level = LvlFatal
+	case "error":
+		g_level = LvlError
+	case "warn":
+		g_level = LvlWarn
+	case "info":
+		g_level = LvlInfo
+	case "debug":
+		g_level = LvlDebug
+	}
 }
 
 func reNewLog() {
@@ -107,8 +109,8 @@ func reNewLog() {
 
 func getTimeCodeLine() (string, string) {
 
-	codeline := ""
-	if g_level <= LvlDebug {
+	codeline := "(??:??)"
+	if g_level >= LvlDebug {
 		_, file, line, ok := runtime.Caller(2) //很慢,高级别就不打印行号
 		if !ok {
 			file = "???"
