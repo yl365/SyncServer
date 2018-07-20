@@ -18,14 +18,14 @@ type SID struct {
 	LastAlive uint32 //最后活跃时间
 }
 
-var g_SID map[uint64]SID
+var g_SID map[uint64]*SID
 var g_SIDlock sync.Mutex
 var g_count uint64
 
 func init() {
 	g_SIDlock.Lock()
 	if g_SID == nil {
-		g_SID = make(map[uint64]SID, 10000)
+		g_SID = make(map[uint64]*SID, 10000)
 	}
 	g_SIDlock.Unlock()
 }
@@ -46,8 +46,12 @@ func DoLogin(login Login_req) uint64 {
 	g_SIDlock.Lock()
 
 	g_count++
-	sid := uint64(nowTS-1500000000)*1000000000 + uint64(g_count%100000)*10000 + uint64(rand.Intn(9999))
-	newSID := SID{Uname: login.Uname, LoginTime: nowTS, LastAlive: nowTS}
+	sid := uint64(nowTS-1531900000)*100000000000 + uint64(g_count%1000000)*100000 + uint64(rand.Intn(99999))
+
+	newSID := new(SID)
+	newSID.Uname = login.Uname
+	newSID.LoginTime = nowTS
+	newSID.LastAlive = nowTS
 	g_SID[sid] = newSID
 
 	g_SIDlock.Unlock()
@@ -80,13 +84,13 @@ func CheckSid(sid uint64) (string, error) {
 	oldSID, have := g_SID[sid]
 
 	if have {
-		if nowTS-oldSID.LastAlive < g_conf.SidTimeOut {
-			Info("CheckSid: Sid=%d <--> Uname=%s", sid, oldSID.Uname)
+		TI := nowTS - oldSID.LastAlive //无符号的负值,会变成最大的正数
+		if TI < g_conf.SidTimeOut || TI > 0x7fffffff {
+			Info("CheckSid: Sid=%d <--> Uname=%s, oldSID.LastAlive=%d", sid, oldSID.Uname, oldSID.LastAlive)
 			oldSID.LastAlive = nowTS
-			g_SID[sid] = oldSID
 			return oldSID.Uname, nil
 		} else {
-			Info("CheckSid: Sid=%d <--> Uname=%s [TimeOut]", sid, oldSID.Uname)
+			Info("CheckSid: Sid=%d <--> Uname=%s [TimeOut=%d]", sid, oldSID.Uname, TI)
 			delete(g_SID, sid)
 		}
 	}

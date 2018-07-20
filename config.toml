@@ -1,23 +1,26 @@
 # 配置文件, utf8编码, 格式遵循TOML配置规范
 # https://github.com/toml-lang/toml#user-content-spec
 
-listen = ':9999'
-# 同一IP请求频率限制: 5分钟内最大请求次数, 超过将限制请求5分钟
-ReqFreqLimit = 300
+# 日志级别 debug, info, error
+LogLevel = 'error'
+
+listen = ':9995'
+# 同一IP请求频率限制: 5分钟内最大请求次数, 超过将限制请求5分钟; 0不限制
+ReqFreqLimit = 0
 
 # 数据存储redis配置
-RedisServer = '10.15.107.61:9000'
+RedisServer = '127.0.0.1:6379'
 RedisPasswd = ''
 RedisDB = 0
 # RedisKey格式: HGETALL D:Uname 
-RedisKey = D:%s
+RedisKey = 'D:%s'
 
 # 用户名密码验证的redis, 可以和上面是同一个
-UserRedisServer = '10.15.107.61:9000'
+UserRedisServer = '127.0.0.1:6379'
 UserRedisPasswd = ''
 UserRedisDB = 0
 # UserRedisKey格式: GET U:Uname 
-UserRedisKey = U:%s
+UserRedisKey = 'U:%s'
 
 # 业务相关配置: 每个用户最多多少组, 每个组最多多少项
 UserMaxGrp = 10
