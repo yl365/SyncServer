@@ -2,7 +2,7 @@
 # https://github.com/toml-lang/toml#user-content-spec
 
 # 日志级别 debug, info, error
-LogLevel = 'error'
+LogLevel = 'debug'
 
 listen = ':9995'
 # 同一IP请求频率限制: 5分钟内最大请求次数, 超过将限制请求5分钟; 0不限制
