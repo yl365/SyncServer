@@ -12,8 +12,6 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
-type HttpHandler struct{}
-
 var redisPool *redis.Pool
 var UserRedisPool *redis.Pool
 
@@ -29,10 +27,10 @@ func init() {
 	UserRedisPool = newPool(g_conf.UserRedisServer, g_conf.UserRedisPasswd, int(g_conf.UserRedisDB))
 }
 
-func (h *HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func HttpHandlerFunc(w http.ResponseWriter, r *http.Request) {
 
 	r.ParseForm()
-	Info("ServeHTTP RemoteAddr=%s, r.URL.Path=%s, Form=%+v", r.RemoteAddr, r.URL.Path, r.Form)
+	Info("HttpHandlerFunc RemoteAddr=%s, r.URL.Path=%s, Form=%+v", r.RemoteAddr, r.URL.Path, r.Form)
 
 	if g_conf.ReqFreqLimit > 0 && IsLimit(r.RemoteAddr, g_conf.ReqFreqLimit) {
 		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(ReqFreqLimit)\"}"))
@@ -73,7 +71,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:              g_conf.Listen,
-		Handler:           &HttpHandler{},
+		Handler:           http.HandlerFunc(HttpHandlerFunc),
 		ReadHeaderTimeout: 3 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
