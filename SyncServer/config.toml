@@ -3,20 +3,22 @@
 
 # 日志级别 debug, info, error
 LogLevel = 'debug'
+# 如果开启,将在程序的第一分钟做Profile,方便分析程序
+EnableProfile = false
 
 listen = ':9995'
 # 同一IP请求频率限制: 5分钟内最大请求次数, 超过将限制请求5分钟; 0不限制
 ReqFreqLimit = 0
 
 # 数据存储redis配置
-RedisServer = '127.0.0.1:6379'
+RedisServer = '10.15.107.61:6379'
 RedisPasswd = ''
 RedisDB = 0
 # RedisKey格式: HGETALL D:Uname 
 RedisKey = 'D:%s'
 
 # 用户名密码验证的redis, 可以和上面是同一个
-UserRedisServer = '127.0.0.1:6379'
+UserRedisServer = '10.15.107.61:6379'
 UserRedisPasswd = ''
 UserRedisDB = 0
 # UserRedisKey格式: GET U:Uname 
