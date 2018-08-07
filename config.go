@@ -6,9 +6,10 @@ import (
 )
 
 type Config struct {
-	LogLevel     string
-	Listen       string
-	ReqFreqLimit uint16
+	LogLevel      string
+	EnableProfile bool
+	Listen        string
+	ReqFreqLimit  uint16
 
 	RedisServer string
 	RedisPasswd string

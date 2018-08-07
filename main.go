@@ -2,12 +2,17 @@
 package main
 
 import (
+	"encoding/json"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime/pprof"
 	"strings"
 	"time"
+
+	"github.com/gobwas/ws"
+	"github.com/gobwas/ws/wsutil"
 
 	"github.com/gomodule/redigo/redis"
 )
@@ -27,35 +32,117 @@ func init() {
 	UserRedisPool = newPool(g_conf.UserRedisServer, g_conf.UserRedisPasswd, int(g_conf.UserRedisDB))
 }
 
+func ParseCmd(req string) string {
+
+	respStr := ""
+	Data := DataPackage{}
+	err := json.Unmarshal([]byte(req), &Data)
+	if err != nil {
+		return "{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"
+	}
+
+	DataType := strings.ToLower(Data.Type)
+	switch DataType {
+	case "login":
+		respStr = Login(req)
+	case "logout":
+		respStr = Logout(req)
+	case "allgrp":
+		respStr = AllGrp(req)
+	case "creategrp":
+		respStr = CreateGrp(req)
+	case "deletegrp":
+		respStr = DeleteGrp(req)
+	case "renamegrp":
+		respStr = RenameGrp(req)
+	case "changegrporder":
+		respStr = ChangeGrpOrder(req)
+	case "upload":
+		respStr = Upload(req)
+	case "download":
+		respStr = Download(req)
+	default:
+		respStr = "{\"Code\":-1,\"Msg\":\"fail(Invalid request)\"}"
+	}
+
+	return respStr
+
+}
+
+func WsHandlerFunc(w http.ResponseWriter, r *http.Request) {
+	conn, _, _, err := ws.UpgradeHTTP(r, w, nil)
+	if err != nil {
+		Info("WsHandlerFunc RemoteAddr=%s, r.URL.Path=%s, ws.UpgradeHTTP err=%+v", r.RemoteAddr, r.URL.Path, err.Error())
+		return
+	}
+
+	go func() {
+		defer conn.Close()
+
+		for {
+			req := ""
+			respStr := ""
+
+			msg, op, err := wsutil.ReadClientData(conn)
+			if err != nil {
+				Info("WsHandlerFunc wsutil.ReadClientData err=%s", err.Error())
+				break
+			}
+
+			if g_conf.ReqFreqLimit > 0 && IsLimit(r.RemoteAddr, g_conf.ReqFreqLimit) {
+				respStr = "{\"Code\":-1,\"Msg\":\"fail(ReqFreqLimit)\"}"
+			} else {
+				req = string(msg)
+				respStr = ParseCmd(req)
+			}
+
+			err = wsutil.WriteServerMessage(conn, op, []byte(respStr))
+			if err != nil {
+				Info("WsHandlerFunc wsutil.WriteServerMessage err=%s", err.Error())
+				break
+			}
+
+			Info("WsHandlerFunc RemoteAddr=%s, r.URL.Path=%s, req=%s, resp=%s", r.RemoteAddr, r.URL.Path, req, respStr)
+		}
+	}()
+}
+func ApiHandlerFunc(w http.ResponseWriter, r *http.Request) {
+
+	req := ""
+	respStr := ""
+	for {
+		if g_conf.ReqFreqLimit > 0 && IsLimit(r.RemoteAddr, g_conf.ReqFreqLimit) {
+			respStr = "{\"Code\":-1,\"Msg\":\"fail(ReqFreqLimit)\"}"
+			break
+		}
+
+		req = r.Form.Get("req")
+		req, err := url.QueryUnescape(req)
+		if err != nil {
+			respStr = "{\"Code\":-1,\"Msg\":\"fail(req data)\"}"
+			break
+		}
+
+		respStr = ParseCmd(req)
+		break
+	}
+
+	w.Header().Add("Content-Type", "application/json; charset=utf-8")
+	w.Write([]byte(respStr))
+	Info("ApiHandlerFunc RemoteAddr=%s, r.URL.Path=%s, req=%s, resp=%s", r.RemoteAddr, r.URL.Path, req, respStr)
+}
+
 func HttpHandlerFunc(w http.ResponseWriter, r *http.Request) {
 
 	r.ParseForm()
 	Info("HttpHandlerFunc RemoteAddr=%s, r.URL.Path=%s, Form=%+v", r.RemoteAddr, r.URL.Path, r.Form)
 
-	if g_conf.ReqFreqLimit > 0 && IsLimit(r.RemoteAddr, g_conf.ReqFreqLimit) {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(ReqFreqLimit)\"}"))
-		return
-	}
-
 	switch {
-	case strings.EqualFold(r.URL.Path, "/api/v1/Login"):
-		Login(w, r)
-	case strings.EqualFold(r.URL.Path, "/api/v1/Logout"):
-		Logout(w, r)
-	case strings.EqualFold(r.URL.Path, "/api/v1/AllGrp"):
-		AllGrp(w, r)
-	case strings.EqualFold(r.URL.Path, "/api/v1/CreateGrp"):
-		CreateGrp(w, r)
-	case strings.EqualFold(r.URL.Path, "/api/v1/DeleteGrp"):
-		DeleteGrp(w, r)
-	case strings.EqualFold(r.URL.Path, "/api/v1/RenameGrp"):
-		RenameGrp(w, r)
-	case strings.EqualFold(r.URL.Path, "/api/v1/ChangeGrpOrder"):
-		ChangeGrpOrder(w, r)
-	case strings.EqualFold(r.URL.Path, "/api/v1/Upload"):
-		Upload(w, r)
-	case strings.EqualFold(r.URL.Path, "/api/v1/Download"):
-		Download(w, r)
+	case strings.EqualFold(r.URL.Path, "/api"):
+		ApiHandlerFunc(w, r)
+
+	case strings.EqualFold(r.URL.Path, "/ws"):
+		WsHandlerFunc(w, r)
 
 	default:
 		staticHandler.ServeHTTP(w, r)
@@ -63,9 +150,6 @@ func HttpHandlerFunc(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	cpuf, _ := os.Create("cpu_profile")
-	pprof.StartCPUProfile(cpuf)
-
 	Info("##################### start...")
 	go crontab()
 
@@ -87,17 +171,27 @@ func main() {
 
 func crontab() {
 
+	if g_conf.EnableProfile {
+		cpuf, _ := os.Create("cpu_profile")
+		pprof.StartCPUProfile(cpuf)
+	}
+
+	StopProfileFun := func() {
+		if g_conf.EnableProfile {
+			pprof.StopCPUProfile()
+			memf, _ := os.Create("mem_profile")
+			pprof.WriteHeapProfile(memf)
+			memf.Close()
+		}
+	}
+
 	ticker1M := time.NewTicker(60 * time.Second)
 	ticker5M := time.NewTicker(300 * time.Second)
 	ticker1H := time.NewTicker(3600 * time.Second)
 	for {
 		select {
 		case <-ticker1M.C:
-			pprof.StopCPUProfile()
-
-			memf, _ := os.Create("mem_profile")
-			pprof.WriteHeapProfile(memf)
-			memf.Close()
+			StopProfileFun()
 
 		case <-ticker5M.C:
 

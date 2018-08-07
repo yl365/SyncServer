@@ -19,11 +19,19 @@ type StoreFormat struct {
 }
 
 /*
+	协议格式: {"Type":"xxx",...}
+*/
+type DataPackage struct {
+	Type string `json:"Type"`
+}
+
+/*
 	登入:
-		请求: {"Uname":"xxx","Passwd":"xxx"}
+		请求: {"Type":"xxx","Uname":"xxx","Passwd":"xxx"}
 		返回: {"Code":0,"Msg":"suc/fail","Sid":nnn}
 */
 type Login_req struct {
+	Type   string `json:"Type"`
 	Uname  string `json:"Uname"`
 	Passwd string `json:"Passwd"`
 }

@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -99,21 +97,13 @@ func DelGrp(Uname string, GrpIDs []uint64) error {
 	return nil
 }
 
-func Login(w http.ResponseWriter, r *http.Request) {
+func Login(req string) string {
 	defer profiler("Login", time.Now().UnixNano())
-	w.Header().Add("Content-Type", "application/json;charset=utf-8")
 
-	req := r.Form.Get("req")
-	req, err := url.QueryUnescape(req)
-	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(req)\"}"))
-		return
-	}
 	var reqStruct Login_req
-	err = json.Unmarshal([]byte(req), &reqStruct)
+	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(req)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(req)\"}"
 	}
 
 	respStr := ""
@@ -123,206 +113,147 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	} else {
 		respStr = fmt.Sprintf("{\"Code\":-1,\"Msg\":\"fail\"}")
 	}
-	w.Write([]byte(respStr))
-	return
+
+	return respStr
 }
 
-func Logout(w http.ResponseWriter, r *http.Request) {
+func Logout(req string) string {
 	defer profiler("Logout", time.Now().UnixNano())
-	w.Header().Add("Content-Type", "application/json;charset=utf-8")
 
-	req := r.Form.Get("req")
-	req, err := url.QueryUnescape(req)
-	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(req)\"}"))
-		return
-	}
 	var reqStruct Logout_req
-	err = json.Unmarshal([]byte(req), &reqStruct)
+	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(req)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(req)\"}"
 	}
 
 	DoLogout(reqStruct.Sid)
 	respStr := ("{\"Code\":0,\"Msg\":\"suc\"}")
-	w.Write([]byte(respStr))
-	return
+	return respStr
 }
 
-func AllGrp(w http.ResponseWriter, r *http.Request) {
+func AllGrp(req string) string {
 	defer profiler("AllGrp", time.Now().UnixNano())
-	w.Header().Add("Content-Type", "application/json;charset=utf-8")
 
-	req := r.Form.Get("req")
-	req, err := url.QueryUnescape(req)
-	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(req)\"}"))
-		return
-	}
 	var reqStruct AllGrp_req
-	err = json.Unmarshal([]byte(req), &reqStruct)
+	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(req)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(req)\"}"
 	}
 
 	Uname, err := CheckSid(reqStruct.Sid)
 	if err != nil || len(Uname) == 0 {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"
 	}
 
 	resp, err := GetAllGrp(Uname)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(db)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
 	}
 
 	respBody, err := json.Marshal(resp)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(resp)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(resp)\"}"
 	}
 
-	w.Write(respBody)
-	return
+	return string(respBody)
 }
 
-func CreateGrp(w http.ResponseWriter, r *http.Request) {
+func CreateGrp(req string) string {
 	defer profiler("CreateGrp", time.Now().UnixNano())
-	w.Header().Add("Content-Type", "application/json; charset=utf-8")
 
-	req := r.Form.Get("req")
-	req, err := url.QueryUnescape(req)
-	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(req data)\"}"))
-		return
-	}
 	var reqStruct CreateGrp_req
-	err = json.Unmarshal([]byte(req), &reqStruct)
+	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"
 	}
 
 	Uname, err := CheckSid(reqStruct.Sid)
 	if err != nil || len(Uname) == 0 {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"
 	}
 
 	AllGrp, err := GetAllGrp(Uname)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(db)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
 	}
 
 	//check Grp NUM
 	if uint16(len(AllGrp.Grps)) >= g_conf.UserMaxGrp {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"More than the largest number of groups\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"More than the largest number of groups\"}"
 	}
 
 	//check GrpName
 	for _, V := range AllGrp.Grps {
 		if strings.EqualFold(reqStruct.GrpName, V.GrpName) {
-			w.Write([]byte("{\"Code\":-1,\"Msg\":\"already existed\"}"))
-			return
+			return "{\"Code\":-1,\"Msg\":\"already existed\"}"
 		}
 	}
 
 	storeData := &StoreFormat{Order: len(AllGrp.Grps), GrpID: uint64(time.Now().UnixNano() / 1000000), GrpName: reqStruct.GrpName, GrpVer: 0, Items: []string{}}
 	err = SetGrpData(Uname, storeData.GrpID, storeData)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(db)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
 	}
 
 	resp := &CreateGrp_resp{Code: 0, Msg: "suc", GrpID: storeData.GrpID, GrpVer: storeData.GrpVer}
 	respBody, err := json.Marshal(resp)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail\"}"
 	}
 
-	w.Write(respBody)
-	return
+	return string(respBody)
 }
 
-func DeleteGrp(w http.ResponseWriter, r *http.Request) {
+func DeleteGrp(req string) string {
 	defer profiler("DeleteGrp", time.Now().UnixNano())
-	w.Header().Add("Content-Type", "application/json; charset=utf-8")
 
-	req := r.Form.Get("req")
-	req, err := url.QueryUnescape(req)
-	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(req data)\"}"))
-		return
-	}
 	var reqStruct DeleteGrp_req
-	err = json.Unmarshal([]byte(req), &reqStruct)
+	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"
 	}
 
 	Uname, err := CheckSid(reqStruct.Sid)
 	if err != nil || len(Uname) == 0 {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"
 	}
 
 	err = DelGrp(Uname, reqStruct.GrpIDs)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(db)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
 	}
 
-	w.Write([]byte("{\"Code\":0,\"Msg\":\"suc\"}"))
-	return
+	return "{\"Code\":0,\"Msg\":\"suc\"}"
 }
 
-func RenameGrp(w http.ResponseWriter, r *http.Request) {
+func RenameGrp(req string) string {
 	defer profiler("RenameGrp", time.Now().UnixNano())
-	w.Header().Add("Content-Type", "application/json; charset=utf-8")
 
-	req := r.Form.Get("req")
-	req, err := url.QueryUnescape(req)
-	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(req data)\"}"))
-		return
-	}
 	var reqStruct RenameGrp_req
-	err = json.Unmarshal([]byte(req), &reqStruct)
+	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"
 	}
 
 	Uname, err := CheckSid(reqStruct.Sid)
 	if err != nil || len(Uname) == 0 {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"
 	}
 
 	storeData, err := GetGrpData(Uname, reqStruct.GrpID)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(db)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
 	}
 
 	AllGrp, err := GetAllGrp(Uname)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(db)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
 	}
 
 	//check NewGrpName
 	for _, V := range AllGrp.Grps {
 		if strings.EqualFold(reqStruct.NewGrpName, V.GrpName) {
-			w.Write([]byte("{\"Code\":-1,\"Msg\":\"already existed\"}"))
-			return
+			return "{\"Code\":-1,\"Msg\":\"already existed\"}"
 		}
 	}
 
@@ -331,91 +262,66 @@ func RenameGrp(w http.ResponseWriter, r *http.Request) {
 
 	err = SetGrpData(Uname, reqStruct.GrpID, storeData)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(db)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
 	}
 
 	resp := &RenameGrp_resp{Code: 0, Msg: "suc", GrpID: reqStruct.GrpID, GrpVer: storeData.GrpVer}
 	respBody, err := json.Marshal(resp)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail\"}"
 	}
 
-	w.Write(respBody)
-	return
+	return string(respBody)
 }
 
-func ChangeGrpOrder(w http.ResponseWriter, r *http.Request) {
+func ChangeGrpOrder(req string) string {
 	defer profiler("ChangeOrderGrp", time.Now().UnixNano())
-	w.Header().Add("Content-Type", "application/json; charset=utf-8")
 
-	req := r.Form.Get("req")
-	req, err := url.QueryUnescape(req)
-	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(req data)\"}"))
-		return
-	}
 	var reqStruct ChangeGrpOrder_req
-	err = json.Unmarshal([]byte(req), &reqStruct)
+	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"
 	}
 
 	Uname, err := CheckSid(reqStruct.Sid)
 	if err != nil || len(Uname) == 0 {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"
 	}
 
 	for i, GrpID := range reqStruct.GrpOrder {
 
 		storeData, err := GetGrpData(Uname, GrpID)
 		if err != nil {
-			w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(db)\"}"))
-			return
+			return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
 		}
 
 		storeData.Order = i
 		err = SetGrpData(Uname, GrpID, storeData)
 		if err != nil {
-			w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(db)\"}"))
-			return
+			return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
 		}
 	}
 
-	w.Write([]byte("{\"Code\":0,\"Msg\":\"suc\"}"))
-	return
+	return "{\"Code\":0,\"Msg\":\"suc\"}"
 }
 
-func Upload(w http.ResponseWriter, r *http.Request) {
+func Upload(req string) string {
 	defer profiler("Upload", time.Now().UnixNano())
-	w.Header().Add("Content-Type", "application/json; charset=utf-8")
 
-	req := r.Form.Get("req")
-	req, err := url.QueryUnescape(req)
-	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(req data)\"}"))
-		return
-	}
 	var reqStruct Upload_req
-	err = json.Unmarshal([]byte(req), &reqStruct)
+	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"
 	}
 
 	Uname, err := CheckSid(reqStruct.Sid)
 	if err != nil || len(Uname) == 0 {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"
 	}
 
 	storeData, err := GetGrpData(Uname, reqStruct.GrpID)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(db)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
 	}
 
 	bReturnItems := false
@@ -426,8 +332,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	switch reqStruct.Action {
 	case 0:
 		if uint16(len(storeData.Items))+uint16(len(reqStruct.Items)) > g_conf.GrpMaxItem {
-			w.Write([]byte("{\"Code\":-1,\"Msg\":\"More than the largest number of item\"}"))
-			return
+			return "{\"Code\":-1,\"Msg\":\"More than the largest number of item\"}"
 		}
 		reqStruct.Items = append(reqStruct.Items, storeData.Items...)
 		storeData.Items = reqStruct.Items
@@ -449,8 +354,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	case 2:
 		if uint16(len(reqStruct.Items)) > g_conf.GrpMaxItem {
-			w.Write([]byte("{\"Code\":-1,\"Msg\":\"More than the largest number of item\"}"))
-			return
+			return "{\"Code\":-1,\"Msg\":\"More than the largest number of item\"}"
 		}
 		storeData.Items = reqStruct.Items
 	}
@@ -458,8 +362,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	err = SetGrpData(Uname, reqStruct.GrpID, storeData)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(db)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
 	}
 
 	var respBody []byte
@@ -473,56 +376,41 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail\"}"
 	}
-	w.Write(respBody)
-	return
+
+	return string(respBody)
 }
 
-func Download(w http.ResponseWriter, r *http.Request) {
+func Download(req string) string {
 	defer profiler("Download", time.Now().UnixNano())
-	w.Header().Add("Content-Type", "application/json; charset=utf-8")
-
-	req := r.Form.Get("req")
-	req, err := url.QueryUnescape(req)
-	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(req data)\"}"))
-		return
-	}
 	var reqStruct Download_req
-	err = json.Unmarshal([]byte(req), &reqStruct)
+	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"
 	}
 
 	Uname, err := CheckSid(reqStruct.Sid)
 	if err != nil || len(Uname) == 0 {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"
 	}
 
 	storeData, err := GetGrpData(Uname, reqStruct.GrpID)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail(db)\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
 	}
 
 	if reqStruct.GrpVer == storeData.GrpVer {
 		respStr := fmt.Sprintf("{\"Code\":1,\"Msg\":\"isLatest\",\"GrpID\":%d, \"GrpVer\":%d}",
 			storeData.GrpID, storeData.GrpVer)
-		w.Write([]byte(respStr))
-		return
+		return respStr
 	}
 
 	resp := &Download_resp{Code: 0, Msg: "suc", GrpID: storeData.GrpID, GrpVer: storeData.GrpVer}
 	resp.Items = storeData.Items
 	respBody, err := json.Marshal(resp)
 	if err != nil {
-		w.Write([]byte("{\"Code\":-1,\"Msg\":\"fail\"}"))
-		return
+		return "{\"Code\":-1,\"Msg\":\"fail\"}"
 	}
-	w.Write(respBody)
-	return
+	return string(respBody)
 }
