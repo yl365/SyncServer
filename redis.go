@@ -9,7 +9,7 @@ import (
 func newPool(addr, password string, db int) *redis.Pool {
 	return &redis.Pool{
 
-		MaxActive:   300,
+		MaxActive:   900,
 		MaxIdle:     30,
 		Wait:        true,
 		IdleTimeout: 300 * time.Second,

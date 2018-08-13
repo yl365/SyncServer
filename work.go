@@ -97,163 +97,163 @@ func DelGrp(Uname string, GrpIDs []uint64) error {
 	return nil
 }
 
-func Login(req string) string {
+func Login(Tid uint32, req string) string {
 	defer profiler("Login", time.Now().UnixNano())
 
 	var reqStruct Login_req
 	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(req)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(req)\"}", Tid)
 	}
 
 	respStr := ""
 	sid := DoLogin(reqStruct)
 	if sid > 0 {
-		respStr = fmt.Sprintf("{\"Code\":0,\"Msg\":\"suc\",\"Sid\":%d}", sid)
+		respStr = fmt.Sprintf("{\"Tid\":%u,\"Code\":0,\"Msg\":\"suc\",\"Sid\":%d}", Tid, sid)
 	} else {
-		respStr = fmt.Sprintf("{\"Code\":-1,\"Msg\":\"fail\"}")
+		respStr = fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail\"}", Tid)
 	}
 
 	return respStr
 }
 
-func Logout(req string) string {
+func Logout(Tid uint32, req string) string {
 	defer profiler("Logout", time.Now().UnixNano())
 
 	var reqStruct Logout_req
 	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(req)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(req)\"}", Tid)
 	}
 
 	DoLogout(reqStruct.Sid)
-	respStr := ("{\"Code\":0,\"Msg\":\"suc\"}")
-	return respStr
+	return fmt.Sprintf("{\"Tid\":%u,\"Code\":0,\"Msg\":\"suc\"}", Tid)
 }
 
-func AllGrp(req string) string {
+func AllGrp(Tid uint32, req string) string {
 	defer profiler("AllGrp", time.Now().UnixNano())
 
 	var reqStruct AllGrp_req
 	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(req)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(req)\"}", Tid)
 	}
 
 	Uname, err := CheckSid(reqStruct.Sid)
 	if err != nil || len(Uname) == 0 {
-		return "{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(Sid)\"}", Tid)
 	}
 
 	resp, err := GetAllGrp(Uname)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(db)\"}", Tid)
 	}
 
+	resp.Tid = Tid
 	respBody, err := json.Marshal(resp)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(resp)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(resp)\"}", Tid)
 	}
 
 	return string(respBody)
 }
 
-func CreateGrp(req string) string {
+func CreateGrp(Tid uint32, req string) string {
 	defer profiler("CreateGrp", time.Now().UnixNano())
 
 	var reqStruct CreateGrp_req
 	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(data parse)\"}", Tid)
 	}
 
 	Uname, err := CheckSid(reqStruct.Sid)
 	if err != nil || len(Uname) == 0 {
-		return "{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(Sid)\"}", Tid)
 	}
 
 	AllGrp, err := GetAllGrp(Uname)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(db)\"}", Tid)
 	}
 
 	//check Grp NUM
 	if uint16(len(AllGrp.Grps)) >= g_conf.UserMaxGrp {
-		return "{\"Code\":-1,\"Msg\":\"More than the largest number of groups\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"More than the largest number of groups\"}", Tid)
 	}
 
 	//check GrpName
 	for _, V := range AllGrp.Grps {
 		if strings.EqualFold(reqStruct.GrpName, V.GrpName) {
-			return "{\"Code\":-1,\"Msg\":\"already existed\"}"
+			return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"already existed\"}", Tid)
 		}
 	}
 
 	storeData := &StoreFormat{Order: len(AllGrp.Grps), GrpID: uint64(time.Now().UnixNano() / 1000000), GrpName: reqStruct.GrpName, GrpVer: 0, Items: []string{}}
 	err = SetGrpData(Uname, storeData.GrpID, storeData)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(db)\"}", Tid)
 	}
 
-	resp := &CreateGrp_resp{Code: 0, Msg: "suc", GrpID: storeData.GrpID, GrpVer: storeData.GrpVer}
+	resp := &CreateGrp_resp{Tid: Tid, Code: 0, Msg: "suc", GrpID: storeData.GrpID, GrpVer: storeData.GrpVer}
 	respBody, err := json.Marshal(resp)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail\"}", Tid)
 	}
 
 	return string(respBody)
 }
 
-func DeleteGrp(req string) string {
+func DeleteGrp(Tid uint32, req string) string {
 	defer profiler("DeleteGrp", time.Now().UnixNano())
 
 	var reqStruct DeleteGrp_req
 	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(data parse)\"}", Tid)
 	}
 
 	Uname, err := CheckSid(reqStruct.Sid)
 	if err != nil || len(Uname) == 0 {
-		return "{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(Sid)\"}", Tid)
 	}
 
 	err = DelGrp(Uname, reqStruct.GrpIDs)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(db)\"}", Tid)
 	}
 
-	return "{\"Code\":0,\"Msg\":\"suc\"}"
+	return fmt.Sprintf("{\"Tid\":%u,\"Code\":0,\"Msg\":\"suc\"}", Tid)
 }
 
-func RenameGrp(req string) string {
+func RenameGrp(Tid uint32, req string) string {
 	defer profiler("RenameGrp", time.Now().UnixNano())
 
 	var reqStruct RenameGrp_req
 	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(data parse)\"}", Tid)
 	}
 
 	Uname, err := CheckSid(reqStruct.Sid)
 	if err != nil || len(Uname) == 0 {
-		return "{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(Sid)\"}", Tid)
 	}
 
 	storeData, err := GetGrpData(Uname, reqStruct.GrpID)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(db)\"}", Tid)
 	}
 
 	AllGrp, err := GetAllGrp(Uname)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(db)\"}", Tid)
 	}
 
 	//check NewGrpName
 	for _, V := range AllGrp.Grps {
 		if strings.EqualFold(reqStruct.NewGrpName, V.GrpName) {
-			return "{\"Code\":-1,\"Msg\":\"already existed\"}"
+			return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"already existed\"}", Tid)
 		}
 	}
 
@@ -262,66 +262,66 @@ func RenameGrp(req string) string {
 
 	err = SetGrpData(Uname, reqStruct.GrpID, storeData)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(db)\"}", Tid)
 	}
 
-	resp := &RenameGrp_resp{Code: 0, Msg: "suc", GrpID: reqStruct.GrpID, GrpVer: storeData.GrpVer}
+	resp := &RenameGrp_resp{Tid: Tid, Code: 0, Msg: "suc", GrpID: reqStruct.GrpID, GrpVer: storeData.GrpVer}
 	respBody, err := json.Marshal(resp)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail\"}", Tid)
 	}
 
 	return string(respBody)
 }
 
-func ChangeGrpOrder(req string) string {
+func ChangeGrpOrder(Tid uint32, req string) string {
 	defer profiler("ChangeOrderGrp", time.Now().UnixNano())
 
 	var reqStruct ChangeGrpOrder_req
 	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(data parse)\"}", Tid)
 	}
 
 	Uname, err := CheckSid(reqStruct.Sid)
 	if err != nil || len(Uname) == 0 {
-		return "{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(Sid)\"}", Tid)
 	}
 
 	for i, GrpID := range reqStruct.GrpOrder {
 
 		storeData, err := GetGrpData(Uname, GrpID)
 		if err != nil {
-			return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
+			return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(db)\"}", Tid)
 		}
 
 		storeData.Order = i
 		err = SetGrpData(Uname, GrpID, storeData)
 		if err != nil {
-			return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
+			return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(db)\"}", Tid)
 		}
 	}
 
-	return "{\"Code\":0,\"Msg\":\"suc\"}"
+	return fmt.Sprintf("{\"Tid\":%u,\"Code\":0,\"Msg\":\"suc\"}", Tid)
 }
 
-func Upload(req string) string {
+func Upload(Tid uint32, req string) string {
 	defer profiler("Upload", time.Now().UnixNano())
 
 	var reqStruct Upload_req
 	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(data parse)\"}", Tid)
 	}
 
 	Uname, err := CheckSid(reqStruct.Sid)
 	if err != nil || len(Uname) == 0 {
-		return "{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(Sid)\"}", Tid)
 	}
 
 	storeData, err := GetGrpData(Uname, reqStruct.GrpID)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(db)\"}", Tid)
 	}
 
 	bReturnItems := false
@@ -332,7 +332,7 @@ func Upload(req string) string {
 	switch reqStruct.Action {
 	case 0:
 		if uint16(len(storeData.Items))+uint16(len(reqStruct.Items)) > g_conf.GrpMaxItem {
-			return "{\"Code\":-1,\"Msg\":\"More than the largest number of item\"}"
+			return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"More than the largest number of item\"}", Tid)
 		}
 		reqStruct.Items = append(reqStruct.Items, storeData.Items...)
 		storeData.Items = reqStruct.Items
@@ -354,7 +354,7 @@ func Upload(req string) string {
 		}
 	case 2:
 		if uint16(len(reqStruct.Items)) > g_conf.GrpMaxItem {
-			return "{\"Code\":-1,\"Msg\":\"More than the largest number of item\"}"
+			return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"More than the largest number of item\"}", Tid)
 		}
 		storeData.Items = reqStruct.Items
 	}
@@ -362,55 +362,55 @@ func Upload(req string) string {
 
 	err = SetGrpData(Uname, reqStruct.GrpID, storeData)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(db)\"}", Tid)
 	}
 
 	var respBody []byte
 	if bReturnItems {
-		resp := &Download_resp{Code: 2, Msg: "suc", GrpID: storeData.GrpID, GrpVer: storeData.GrpVer}
+		resp := &Download_resp{Tid: Tid, Code: 2, Msg: "suc", GrpID: storeData.GrpID, GrpVer: storeData.GrpVer}
 		resp.Items = storeData.Items
 		respBody, err = json.Marshal(resp)
 	} else {
-		resp := &Upload_resp{Code: 0, Msg: "suc", GrpID: storeData.GrpID, GrpVer: storeData.GrpVer}
+		resp := &Upload_resp{Tid: Tid, Code: 0, Msg: "suc", GrpID: storeData.GrpID, GrpVer: storeData.GrpVer}
 		respBody, err = json.Marshal(resp)
 	}
 
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail\"}", Tid)
 	}
 
 	return string(respBody)
 }
 
-func Download(req string) string {
+func Download(Tid uint32, req string) string {
 	defer profiler("Download", time.Now().UnixNano())
 	var reqStruct Download_req
 	err := json.Unmarshal([]byte(req), &reqStruct)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(data parse)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(data parse)\"}", Tid)
 	}
 
 	Uname, err := CheckSid(reqStruct.Sid)
 	if err != nil || len(Uname) == 0 {
-		return "{\"Code\":-1,\"Msg\":\"fail(Sid)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(Sid)\"}", Tid)
 	}
 
 	storeData, err := GetGrpData(Uname, reqStruct.GrpID)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail(db)\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(db)\"}", Tid)
 	}
 
 	if reqStruct.GrpVer == storeData.GrpVer {
-		respStr := fmt.Sprintf("{\"Code\":1,\"Msg\":\"isLatest\",\"GrpID\":%d, \"GrpVer\":%d}",
-			storeData.GrpID, storeData.GrpVer)
+		respStr := fmt.Sprintf("{\"Tid\":%u,\"Code\":1,\"Msg\":\"isLatest\",\"GrpID\":%d, \"GrpVer\":%d}",
+			Tid, storeData.GrpID, storeData.GrpVer)
 		return respStr
 	}
 
-	resp := &Download_resp{Code: 0, Msg: "suc", GrpID: storeData.GrpID, GrpVer: storeData.GrpVer}
+	resp := &Download_resp{Tid: Tid, Code: 0, Msg: "suc", GrpID: storeData.GrpID, GrpVer: storeData.GrpVer}
 	resp.Items = storeData.Items
 	respBody, err := json.Marshal(resp)
 	if err != nil {
-		return "{\"Code\":-1,\"Msg\":\"fail\"}"
+		return fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail\"}", Tid)
 	}
 	return string(respBody)
 }

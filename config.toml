@@ -11,14 +11,14 @@ listen = ':9995'
 ReqFreqLimit = 0
 
 # 数据存储redis配置
-RedisServer = '10.15.107.61:6379'
+RedisServer = '127.0.0.1:6379'
 RedisPasswd = ''
 RedisDB = 0
 # RedisKey格式: HGETALL D:Uname 
 RedisKey = 'D:%s'
 
 # 用户名密码验证的redis, 可以和上面是同一个
-UserRedisServer = '10.15.107.61:6379'
+UserRedisServer = '127.0.0.1:6379'
 UserRedisPasswd = ''
 UserRedisDB = 0
 # UserRedisKey格式: GET U:Uname 

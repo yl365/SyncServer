@@ -3,6 +3,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -44,33 +45,32 @@ func ParseCmd(req string) string {
 	DataType := strings.ToLower(Data.Type)
 	switch DataType {
 	case "login":
-		respStr = Login(req)
+		respStr = Login(Data.Tid, req)
 	case "logout":
-		respStr = Logout(req)
+		respStr = Logout(Data.Tid, req)
 	case "allgrp":
-		respStr = AllGrp(req)
+		respStr = AllGrp(Data.Tid, req)
 	case "creategrp":
-		respStr = CreateGrp(req)
+		respStr = CreateGrp(Data.Tid, req)
 	case "deletegrp":
-		respStr = DeleteGrp(req)
+		respStr = DeleteGrp(Data.Tid, req)
 	case "renamegrp":
-		respStr = RenameGrp(req)
+		respStr = RenameGrp(Data.Tid, req)
 	case "changegrporder":
-		respStr = ChangeGrpOrder(req)
+		respStr = ChangeGrpOrder(Data.Tid, req)
 	case "upload":
-		respStr = Upload(req)
+		respStr = Upload(Data.Tid, req)
 	case "download":
-		respStr = Download(req)
+		respStr = Download(Data.Tid, req)
 	default:
-		respStr = "{\"Code\":-1,\"Msg\":\"fail(Invalid request)\"}"
+		respStr = fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(Invalid request)\"}", Data.Tid)
 	}
 
 	return respStr
-
 }
 
 func WsHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	conn, _, _, err := ws.UpgradeHTTP(r, w, nil)
+	conn, _, _, err := ws.UpgradeHTTP(r, w)
 	if err != nil {
 		Info("WsHandlerFunc RemoteAddr=%s, r.URL.Path=%s, ws.UpgradeHTTP err=%+v", r.RemoteAddr, r.URL.Path, err.Error())
 		return
@@ -106,11 +106,13 @@ func WsHandlerFunc(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 }
+
 func ApiHandlerFunc(w http.ResponseWriter, r *http.Request) {
 
-	req := ""
-	respStr := ""
 	for {
+		req := ""
+		respStr := ""
+
 		if g_conf.ReqFreqLimit > 0 && IsLimit(r.RemoteAddr, g_conf.ReqFreqLimit) {
 			respStr = "{\"Code\":-1,\"Msg\":\"fail(ReqFreqLimit)\"}"
 			break

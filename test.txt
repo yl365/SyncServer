@@ -21,7 +21,7 @@ http://127.0.0.1:9999/api/v1/Download?req={"Sid":512018209521,"GrpID":1529482619
 
 
 
-http://101.132.147.239:9995/api/v1/Login?req={"Uname":"xxx","Passwd":"xxx"}
+http://10.15.108.16:9995/api/v1/Login?req={"Type":"login","Uname":"xxx","Passwd":"xxx"}
 
 31901197000011661
 
@@ -38,3 +38,7 @@ http://101.132.147.239:9995/api/v1/Download?req={"Sid":31901197000011661,"GrpID"
 ./gobench -c 1000 -k -t 30  -u  'http://127.0.0.1:9995/api/v1/AllGrp?req=%7b%22Sid%22%3a31903981000021757%7d'
 
 31903873000019302
+
+{"Type":"login","Uname":"xxx","Passwd":"xxx"}
+
+{"Type":"allgrp","Sid":180753518412709216}
