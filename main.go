@@ -4,9 +4,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
-	"net/url"
 	"os"
 	"runtime/pprof"
 	"strings"
@@ -63,7 +63,7 @@ func ParseCmd(req string) string {
 	case "download":
 		respStr = Download(Data.Tid, req)
 	default:
-		respStr = fmt.Sprintf("{\"Tid\":%u,\"Code\":-1,\"Msg\":\"fail(Invalid request)\"}", Data.Tid)
+		respStr = fmt.Sprintf("{\"Tid\":%d,\"Code\":-1,\"Msg\":\"fail(Invalid request)\"}", Data.Tid)
 	}
 
 	return respStr
@@ -109,26 +109,33 @@ func WsHandlerFunc(w http.ResponseWriter, r *http.Request) {
 
 func ApiHandlerFunc(w http.ResponseWriter, r *http.Request) {
 
-	for {
-		req := ""
-		respStr := ""
+	req := ""
+	respStr := ""
 
-		if g_conf.ReqFreqLimit > 0 && IsLimit(r.RemoteAddr, g_conf.ReqFreqLimit) {
-			respStr = "{\"Code\":-1,\"Msg\":\"fail(ReqFreqLimit)\"}"
-			break
-		}
-
-		req = r.Form.Get("req")
-		req, err := url.QueryUnescape(req)
-		if err != nil {
-			respStr = "{\"Code\":-1,\"Msg\":\"fail(req data)\"}"
-			break
-		}
-
-		respStr = ParseCmd(req)
-		break
+	if g_conf.ReqFreqLimit > 0 && IsLimit(r.RemoteAddr, g_conf.ReqFreqLimit) {
+		respStr = "{\"Code\":-1,\"Msg\":\"fail(ReqFreqLimit)\"}"
+		goto RESP
 	}
 
+	for k, _ := range r.Form { //为同时兼容GET和POST
+		req = k
+		Debug("MethodGet (or Post && Content-Type=application/x-www-form-urlencoded) req=%s", req)
+	}
+
+	if strings.EqualFold(r.Method, http.MethodPost) {
+		postBody, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			respStr = "{\"Code\":-1,\"Msg\":\"fail(ioutil.ReadAll)\"}"
+			goto RESP
+		}
+		if len(postBody) > 0 { //如果有POST数据, 优先使用POST数据
+			req = string(postBody)
+			Debug("MethodPost req=%s", req)
+		}
+	}
+
+	respStr = ParseCmd(req)
+RESP:
 	w.Header().Add("Content-Type", "application/json; charset=utf-8")
 	w.Write([]byte(respStr))
 	Info("ApiHandlerFunc RemoteAddr=%s, r.URL.Path=%s, req=%s, resp=%s", r.RemoteAddr, r.URL.Path, req, respStr)
