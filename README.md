@@ -84,7 +84,7 @@ SidTimeOut = 3600
 
 请求:
 
-	http://v1.domain.com:port/api?req=URLEncode(json) (支持GET/POST)
+	http://v1.domain.com:port/api?URLEncode(json) (同时支持GET/POST,建议使用POST并且设置Content-Type: application/json; charset=utf-8)
 
 	ws://v1.domain.com:port/ws
 	
